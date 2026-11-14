@@ -1,65 +1,50 @@
 import {HttpError} from "../models/error.js"
 import {Availability} from "../models/availability.js"
 import { Appointment } from "../models/appointment.js";
-import moment from "moment";
 import mongoose from "mongoose";
-
-
+import { parseIsoDate } from "../utils/dates.js";
 
 // Controller to set availability
 const setAvailability = async (req, res, next) => {
   try {
-    console.log(req.user);  // Log req.user to see if it's coming through
-    
-    const { startTime, endTime } = req.body;
-    
-    if (!req.user || !req.user.id) {
-      return next(new HttpError("No professor ID found", 400));
+    const startTime = parseIsoDate(req.body.startTime);
+    const endTime = parseIsoDate(req.body.endTime);
+
+    if (!startTime || !endTime) {
+      return next(
+        new HttpError(
+          "startTime and endTime must be ISO 8601 dates with a timezone, e.g. 2027-01-10T10:00:00Z",
+          422
+        )
+      );
+    }
+    if (startTime >= endTime) {
+      return next(new HttpError("Start time must be before end time", 422));
+    }
+    if (startTime <= new Date()) {
+      return next(new HttpError("A slot has to start in the future", 422));
     }
 
-    // Ensure startTime is before endTime
-    if (new Date(startTime) >= new Date(endTime)) {
-      return next(new HttpError("Start time must be before end time", 400));
-    }
-
-    // Check for overlapping availability
-    const existingAvailability = await Availability.findOne({
+    // Two ranges overlap when each one starts before the other ends.
+    // That single condition also covers one range sitting fully inside another.
+    const overlapping = await Availability.exists({
       professorId: req.user.id,
-      $or: [
-        { startTime: { $lt: new Date(endTime) }, endTime: { $gt: new Date(startTime) } }, // Start overlaps
-        { startTime: { $lt: new Date(startTime) }, endTime: { $gt: new Date(endTime) } }  // End overlaps
-      ]
-      // New time starts before an old one finishes
-      // New time finishes after an old one start
+      startTime: { $lt: endTime },
+      endTime: { $gt: startTime },
     });
-
-    if (existingAvailability) {
-      return next(new HttpError("This time slot is already added for you professor", 400));
+    if (overlapping) {
+      return next(new HttpError("This overlaps a slot you already added", 409));
     }
 
-    // Create new availability entry
-    const availability = new Availability({
-      professorId: req.user.id,  // Ensure that professorId is coming from req.user._id
+    const slot = await Availability.create({
+      professorId: req.user.id,
       startTime,
       endTime,
     });
 
-    await availability.save();
-
-    const formattedStartTime = moment.utc(availability.startTime).format('MMMM Do YYYY, h:mm:ss a');
-    const formattedEndTime = moment.utc(availability.endTime).format('MMMM Do YYYY, h:mm:ss a');
-
-    res.status(201).json({
-      message: "Availability added successfully",
-      availability: {
-        ...availability.toObject(),  // Spreading existing availability data
-        startTime: formattedStartTime, // Replacing with formatted date
-        endTime: formattedEndTime, // Replacing  with formatted date
-      },
-    });
+    res.status(201).json({ message: "Availability added successfully", slot });
   } catch (error) {
-    console.log(error);  // Log error for better debugging
-    return next(new HttpError("Adding availability failed", 500));
+    return next(error);
   }
 };
 
