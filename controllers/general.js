@@ -1,137 +1,109 @@
-import { Availability } from "../models/availability.js";
+import { Availability, SLOT_STATUS } from "../models/availability.js";
 import { HttpError } from "../models/error.js";
-import {Appointment} from "../models/appointment.js"
+import { User } from "../models/user.js";
+import { Appointment, APPOINTMENT_STATUS } from "../models/appointment.js";
 import mongoose from 'mongoose';
-import moment from 'moment';  
+  
 
 const getAvailableSlots = async (req, res, next) => {
     try {
         const { professorId } = req.params;
 
-        
-        console.log("Professor ID:", professorId, "Type:", typeof professorId);
-
-        // Check if professorId is valid
         if (!mongoose.Types.ObjectId.isValid(professorId)) {
             return next(new HttpError("Invalid professor ID format", 400));
         }
 
-        // Find availability slots for the professor
-        const availability = await Availability.find({ professorId: new mongoose.Types.ObjectId(professorId) });
-
-        if (!availability || availability.length === 0) {
-            return next(new HttpError("No availability found for this professor", 404));
+        const professor = await User.exists({ _id: professorId, role: "professor" });
+        if (!professor) {
+            return next(new HttpError("Professor not found", 404));
         }
 
-        // Format the available slots using moment.js
-        const availableSlots = availability.map(avail => ({
-            StartTime: moment(avail.startTime).format('MMMM Do YYYY, h:mm:ss a'),
-            EndTime: moment(avail.endTime).format('MMMM Do YYYY, h:mm:ss a'),
-        }));
+        const availableSlots = await Availability.find({
+            professorId,
+            status: "free",
+            startTime: { $gt: new Date() },
+        }).sort({ startTime: 1 });
 
-        res.status(200).json({ availableSlots });
+        // No free slots is a normal state, not an error
+        res.status(200).json({ professorId, availableSlots });
     } catch (error) {
-        return next(new HttpError("Failed to fetch availability", 500));
+        return next(error);
     }
 };
 
 const bookAppointment = async (req, res, next) => {
   try {
-    const { professorId, time } = req.body; // Professor's ID and time (T1) for booking
-    const studentId = req.user.id; // Student's ID from the authenticated user
+    const { slotId } = req.body;
+    const studentId = req.user.id;
 
-    if (!time || !professorId) {
-      return next(new HttpError("Professor ID and time are required", 400));
+    // A string check, not just isValid: it keeps objects like {"$ne": null}
+    // from reaching the query as operators.
+    if (typeof slotId !== "string" || !mongoose.Types.ObjectId.isValid(slotId)) {
+      return next(new HttpError("A valid slotId is required", 400));
     }
 
-    const formattedTime = moment(time).utc().toDate(); // Convert time to UTC Date object
+    // Claim the slot in one atomic step. The database lets only one request
+    // flip a slot from free to booked, so two students can't both get it.
+    const slot = await Availability.findOneAndUpdate(
+      { _id: slotId, status: SLOT_STATUS.FREE, startTime: { $gt: new Date() } },
+      { status: SLOT_STATUS.BOOKED },
+      { new: true }
+    );
 
-    // professor has available slots during the provided time
-    const availability = await Availability.findOne({
-      professorId: new mongoose.Types.ObjectId(professorId),
-      startTime: { $lte: formattedTime }, // Check if the time is greater than or equal to startTime
-      endTime: { $gte: formattedTime },   // Check if the time is less than or equal to endTime
-    });
-
-    // Log the data for debugging
-    console.log('Formatted Time:', formattedTime);
-    console.log('Availability:', availability);
-
-    if (!availability) {
-      return next(new HttpError("Selected time is not available for booking", 400));
+    if (!slot) {
+      const exists = await Availability.exists({ _id: slotId });
+      return next(
+        exists
+          ? new HttpError("This slot is no longer available", 409)
+          : new HttpError("Slot not found", 404)
+      );
     }
 
-    // Check if the student already has a booking for this time
-    const existingAppointment = await Appointment.findOne({
-      studentId: new mongoose.Types.ObjectId(studentId),
-      professorId: new mongoose.Types.ObjectId(professorId),
-      time: formattedTime,
-    });
-
-    if (existingAppointment) {
-      return next(new HttpError("You already have an appointment for this time", 400));
+    let appointment;
+    try {
+      appointment = await Appointment.create({
+        studentId,
+        professorId: slot.professorId,
+        slotId: slot._id,
+        time: slot.startTime,
+      });
+    } catch (error) {
+      // Don't leave the slot stuck as booked if we couldn't save the booking
+      await Availability.updateOne({ _id: slot._id }, { status: SLOT_STATUS.FREE });
+      throw error;
     }
 
-    // Creating the appointment
-    const appointment = new Appointment({
-      studentId: new mongoose.Types.ObjectId(studentId),
-      professorId: new mongoose.Types.ObjectId(professorId),
-      time: formattedTime, // Use formatted time
-    });
-
-    await appointment.save();
-
-    // Format the time using moment.js for response
-    const formattedAppointmentTime = moment.utc(appointment.time).format('MMMM Do YYYY, h:mm:ss a');
-
-    res.status(201).json({
-      message: 'Appointment booked successfully',
-      appointment: {
-        studentId: appointment.studentId,
-        professorId: appointment.professorId,
-        time: formattedAppointmentTime, // Return formatted time
-        status: appointment.status,
-      },
-    });
+    res.status(201).json({ message: "Appointment booked successfully", appointment });
   } catch (error) {
-    console.error("Error booking appointment:", error);
-    return next(new HttpError("Failed to book appointment", 500));
+    return next(error);
   }
 };
 
 
-  const getStudentAppointments = async (req, res, next) => {
-    try {
-      const studentId = req.user.id;  // Extract the student ID from the token (from authMiddleware)
-      console.log("studentId from token:", studentId);
-      console.log("Querying database with studentId:", new mongoose.Types.ObjectId(studentId));
-       // debugging the id
-      // Fetch all booked appointments for the student
-      const appointments = await Appointment.find({
-        studentId:new mongoose.Types.ObjectId(studentId),
-        status: 'booked',  // Only show booked appointments
-      }).populate('professorId', 'name');  // Populate professor's name in the response
-        console.log(appointments);
-      if (!appointments || appointments.length === 0) {
-        return next(new HttpError("You have no pending appointments", 404));
-      }
-  
-      // Format the response to show the appointment details and times
-      const formattedAppointments = appointments.map(appointment => ({
-        professor: appointment.professorId.name,  // Show professor's name
-        appointmentTime: moment.utc(appointment.time).format('MMMM Do YYYY, h:mm:ss a'),  // Format time with moment.js
+const getStudentAppointments = async (req, res, next) => {
+  try {
+    const appointments = await Appointment.find({
+      studentId: req.user.id,
+      status: APPOINTMENT_STATUS.BOOKED,
+    })
+      .sort({ time: 1 })
+      .populate("professorId", "name");
+
+    res.status(200).json({
+      message: appointments.length
+        ? "Your upcoming appointments"
+        : "You have no pending appointments",
+      appointments: appointments.map((appointment) => ({
+        id: appointment.id,
+        // populate gives null if the professor account was deleted
+        professor: appointment.professorId?.name ?? "Unknown",
+        time: appointment.time,
         status: appointment.status,
-      }));
-  
-      res.status(200).json({
-        message: "Your upcoming appointments:",
-        appointments: formattedAppointments,
-      });
-  
-    } catch (error) {
-      console.error("Error fetching appointments:", error);
-      return next(new HttpError("Failed to retrieve appointments", 500));
-    }
-  };
+      })),
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
 
 export { getAvailableSlots, bookAppointment, getStudentAppointments };
