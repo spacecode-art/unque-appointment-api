@@ -1,6 +1,5 @@
 import {HttpError} from "../models/error.js"
-import {Availability} from "../models/availability.js"
-import { Appointment } from "../models/appointment.js";
+import { Availability, SLOT_STATUS } from "../models/availability.js";import { Appointment, APPOINTMENT_STATUS } from "../models/appointment.js";
 import mongoose from "mongoose";
 import { parseIsoDate } from "../utils/dates.js";
 
@@ -50,45 +49,41 @@ const setAvailability = async (req, res, next) => {
 
 
 
-  const cancelAppointments = async(req,res,next) => {
-    try {
-      const { studentId } = req.params;  // Student's ID from params
-      const professorId = req.user.id;   // Professor's ID from the authenticated user
-      console.log('Professor ID:', professorId);  // This should match the professor's ID in the appointment
-      console.log('Student ID:', studentId);
+const cancelAppointments = async (req, res, next) => {
+  try {
+    const { studentId } = req.params;
+    const professorId = req.user.id;
 
-      // Ensuring professor is authenticated and studentId is provided
-      if (!studentId || !mongoose.Types.ObjectId.isValid(studentId)) {
-        return next(new HttpError("Invalid or missing student ID", 400));
-      }
-  
-      // Finding the  appointments between this professor and student
-      const appointments = await Appointment.find({
-        studentId: new mongoose.Types.ObjectId(studentId),
-        professorId: new mongoose.Types.ObjectId(professorId),
-        status: 'booked' // Only cancel booked appointments
-      });
-  
-      if (!appointments || appointments.length === 0) {
-        return next(new HttpError("No appointments found to cancel", 404));
-      }
-  
-      // Updating the status of all appointments to "canceled"
-      await Appointment.updateMany(
-        {
-          studentId: new mongoose.Types.ObjectId(studentId),
-          professorId: new mongoose.Types.ObjectId(professorId),
-          status: 'booked'
-        },
-        { status: 'canceled' }  //  the status  needs to be canceled
-      );
-  
-      res.status(200).json({
-        message: `All appointments between professor ${professorId} and student ${studentId} have been canceled.,`
-      });
-  
-    } catch (error) {
-      return next(error);
+    if (!mongoose.Types.ObjectId.isValid(studentId)) {
+      return next(new HttpError("Invalid student ID", 400));
     }
-  };
+
+    const booked = await Appointment.find({
+      studentId,
+      professorId,
+      status: APPOINTMENT_STATUS.BOOKED,
+    }).select("slotId");
+
+    if (booked.length === 0) {
+      return next(new HttpError("No booked appointments found for this student", 404));
+    }
+
+    // Update by id rather than repeating the filter, so we release exactly
+    // the slots that belong to the appointments we are cancelling.
+    // runValidators would have caught the old "canceled" typo.
+    await Appointment.updateMany(
+      { _id: { $in: booked.map((appointment) => appointment._id) } },
+      { status: APPOINTMENT_STATUS.CANCELLED },
+      { runValidators: true }
+    );
+    await Availability.updateMany(
+      { _id: { $in: booked.map((appointment) => appointment.slotId) } },
+      { status: SLOT_STATUS.FREE }
+    );
+
+    res.status(200).json({ message: "Appointments cancelled", cancelled: booked.length });
+  } catch (error) {
+    return next(error);
+  }
+};
 export {setAvailability, cancelAppointments};
