@@ -61,3 +61,6 @@ Dockerfile
 docker-compose.yml
 docker-compose.override.yml
 docker/
+# Certificates and keys (CA bundle, EC2 key pairs)
+*.pem
+certs/
