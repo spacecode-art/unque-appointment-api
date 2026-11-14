@@ -25,5 +25,11 @@ const profMiddleware = async(req,res,next) => {
       next();
     };
 
+const studentMiddleware = (req, res, next) => {
+  if (req.user.role !== "student") {
+    return next(new HttpError("Access denied, students only", 403));
+  }
+  next();
+};
 
-export { authMiddleware , profMiddleware};
+export { authMiddleware, profMiddleware, studentMiddleware };
