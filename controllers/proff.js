@@ -2,36 +2,44 @@ import {HttpError} from "../models/error.js"
 import { Availability, SLOT_STATUS } from "../models/availability.js";import { Appointment, APPOINTMENT_STATUS } from "../models/appointment.js";
 import mongoose from "mongoose";
 import { parseIsoDate } from "../utils/dates.js";
+// Reads and validates the start/end pair used when creating or editing a slot.
+// Throws an HttpError, which the controllers' catch blocks hand to the error middleware.
+const readSlotTimes = (body) => {
+  const startTime = parseIsoDate(body.startTime);
+  const endTime = parseIsoDate(body.endTime);
+
+  if (!startTime || !endTime) {
+    throw new HttpError(
+      "startTime and endTime must be ISO 8601 dates with a timezone, e.g. 2027-01-10T10:00:00Z",
+      422
+    );
+  }
+  if (startTime >= endTime) {
+    throw new HttpError("Start time must be before end time", 422);
+  }
+  if (startTime <= new Date()) {
+    throw new HttpError("A slot has to start in the future", 422);
+  }
+  return { startTime, endTime };
+};
+
+// Two ranges overlap when each one starts before the other ends. That single
+// condition also covers one range sitting fully inside another. Booked slots
+// count too: a booked hour is still an occupied hour.
+const hasOverlap = (professorId, startTime, endTime, ignoreSlotId) =>
+  Availability.exists({
+    professorId,
+    ...(ignoreSlotId && { _id: { $ne: ignoreSlotId } }),
+    startTime: { $lt: endTime },
+    endTime: { $gt: startTime },
+  });
 
 // Controller to set availability
 const setAvailability = async (req, res, next) => {
   try {
-    const startTime = parseIsoDate(req.body.startTime);
-    const endTime = parseIsoDate(req.body.endTime);
+    const { startTime, endTime } = readSlotTimes(req.body);
 
-    if (!startTime || !endTime) {
-      return next(
-        new HttpError(
-          "startTime and endTime must be ISO 8601 dates with a timezone, e.g. 2027-01-10T10:00:00Z",
-          422
-        )
-      );
-    }
-    if (startTime >= endTime) {
-      return next(new HttpError("Start time must be before end time", 422));
-    }
-    if (startTime <= new Date()) {
-      return next(new HttpError("A slot has to start in the future", 422));
-    }
-
-    // Two ranges overlap when each one starts before the other ends.
-    // That single condition also covers one range sitting fully inside another.
-    const overlapping = await Availability.exists({
-      professorId: req.user.id,
-      startTime: { $lt: endTime },
-      endTime: { $gt: startTime },
-    });
-    if (overlapping) {
+    if (await hasOverlap(req.user.id, startTime, endTime)) {
       return next(new HttpError("This overlaps a slot you already added", 409));
     }
 
@@ -47,6 +55,46 @@ const setAvailability = async (req, res, next) => {
   }
 };
 
+const updateAvailability = async (req, res, next) => {
+  try {
+    const { slotId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(slotId)) {
+      return next(new HttpError("Invalid slot ID", 400));
+    }
+
+    const { startTime, endTime } = readSlotTimes(req.body);
+
+    // Ignore the slot itself, otherwise nudging a slot by ten minutes
+    // would "overlap" with its own old timing.
+    if (await hasOverlap(req.user.id, startTime, endTime, slotId)) {
+      return next(new HttpError("This overlaps another slot of yours", 409));
+    }
+
+    // The filter is the whole safety check: it only matches a slot that is
+    // yours and still free. Looking first and updating after would leave a
+    // gap in which a student could book the slot.
+    const slot = await Availability.findOneAndUpdate(
+      { _id: slotId, professorId: req.user.id, status: SLOT_STATUS.FREE },
+      { startTime, endTime },
+      { new: true, runValidators: true }
+    );
+
+    if (!slot) {
+      // No match: either not yours or doesn't exist (same answer on purpose,
+      // so nobody can probe for other professors' slot ids), or already booked.
+      const isYours = await Availability.exists({ _id: slotId, professorId: req.user.id });
+      return next(
+        isYours
+          ? new HttpError("A booked slot can't be changed, cancel the appointment first", 409)
+          : new HttpError("Slot not found", 404)
+      );
+    }
+
+    res.status(200).json({ message: "Slot updated successfully", slot });
+  } catch (error) {
+    return next(error);
+  }
+};
 
 
 const cancelAppointments = async (req, res, next) => {
@@ -86,4 +134,4 @@ const cancelAppointments = async (req, res, next) => {
     return next(error);
   }
 };
-export {setAvailability, cancelAppointments};
+export { setAvailability, updateAvailability, cancelAppointments };
