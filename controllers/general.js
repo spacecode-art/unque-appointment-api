@@ -80,38 +80,30 @@ const bookAppointment = async (req, res, next) => {
 };
 
 
-  const getStudentAppointments = async (req, res, next) => {
-    try {
-      const studentId = req.user.id;  // Extract the student ID from the token (from authMiddleware)
-      console.log("studentId from token:", studentId);
-      console.log("Querying database with studentId:", new mongoose.Types.ObjectId(studentId));
-       // debugging the id
-      // Fetch all booked appointments for the student
-      const appointments = await Appointment.find({
-        studentId:new mongoose.Types.ObjectId(studentId),
-        status: 'booked',  // Only show booked appointments
-      }).populate('professorId', 'name');  // Populate professor's name in the response
-        console.log(appointments);
-      if (!appointments || appointments.length === 0) {
-        return next(new HttpError("You have no pending appointments", 404));
-      }
-  
-      // Format the response to show the appointment details and times
-      const formattedAppointments = appointments.map(appointment => ({
-        professor: appointment.professorId.name,  // Show professor's name
-        appointmentTime: moment.utc(appointment.time).format('MMMM Do YYYY, h:mm:ss a'),  // Format time with moment.js
+const getStudentAppointments = async (req, res, next) => {
+  try {
+    const appointments = await Appointment.find({
+      studentId: req.user.id,
+      status: APPOINTMENT_STATUS.BOOKED,
+    })
+      .sort({ time: 1 })
+      .populate("professorId", "name");
+
+    res.status(200).json({
+      message: appointments.length
+        ? "Your upcoming appointments"
+        : "You have no pending appointments",
+      appointments: appointments.map((appointment) => ({
+        id: appointment.id,
+        // populate gives null if the professor account was deleted
+        professor: appointment.professorId?.name ?? "Unknown",
+        time: appointment.time,
         status: appointment.status,
-      }));
-  
-      res.status(200).json({
-        message: "Your upcoming appointments:",
-        appointments: formattedAppointments,
-      });
-  
-    } catch (error) {
-      console.error("Error fetching appointments:", error);
-      return next(new HttpError("Failed to retrieve appointments", 500));
-    }
-  };
+      })),
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
 
 export { getAvailableSlots, bookAppointment, getStudentAppointments };
