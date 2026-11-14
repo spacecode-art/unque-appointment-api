@@ -21,3 +21,9 @@ variable "allowed_http_cidrs" {
   type        = list(string)
   default     = ["0.0.0.0/0"]
 }
+
+variable "docdb_instance_class" {
+  description = "DocumentDB instance size. db.t3.medium is the one the free trial covers."
+  type        = string
+  default     = "db.t3.medium"
+}
