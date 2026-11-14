@@ -2,7 +2,7 @@ import { HttpError } from "../models/error.js";
 import { User } from "../models/user.js";        
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken"
-
+import { env } from "../config/env.js";
 // User Registration Controller
 const register = async (req, res, next) => {
   try {
@@ -50,7 +50,7 @@ const login = async(req,res,next) => {
     }
     const {_id: id, name, role} = user;
     // a token requires a payload to work
-     const token = jwt.sign({id, name, role}, process.env.JWT_SECRET, {expiresIn: "2d"});
+     const token = jwt.sign({id, name, role}, env.jwtSecret, {expiresIn: "2d"});
      res.status(200).json({token,id,name, role})
 
   } catch(error) {

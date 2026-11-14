@@ -1,7 +1,7 @@
 import express from "express"
 import mongoose from "mongoose"
 import cors from "cors"
-import dotenv from "dotenv"
+import { env } from "./config/env.js"
 import helmet from "helmet"
 import morgan from "morgan" 
 import {notFound, errorMiddleware} from "./middleware/error.js"
@@ -12,7 +12,7 @@ import professorRoutes from "./routes/proff.js"
 import generalRoutes from "./routes/general.js"
 
 
-dotenv.config();
+
 const app = express();
 app.use(express.json());
 app.use(helmet());
@@ -26,9 +26,8 @@ app.use('/professor',professorRoutes);
 app.use('/general', generalRoutes);
 app.use(notFound)
 app.use(errorMiddleware)
-const PORT = process.env.PORT  || 5001;
-mongoose.connect(process.env.MONGO_URL, {
+mongoose.connect(env.mongoUrl, {
 }).then(() => {
-    app.listen(PORT, () => console.log(`Server Port: ${PORT}`));  
+    app.listen(env.port, () => console.log(`Server Port: ${env.port}`));  
 }).catch((error) => console.log(`${error} did not connect`)); 
 
