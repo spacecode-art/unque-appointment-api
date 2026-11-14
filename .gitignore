@@ -64,3 +64,11 @@ docker/
 # Certificates and keys (CA bundle, EC2 key pairs)
 *.pem
 certs/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
