@@ -91,18 +91,22 @@ const login = async (req, res, next) => {
     return next(error);
   }
 };
-const getUserProfile = async(req,res,next) => {
+const getUserProfile = async (req, res, next) => {
   try {
-   // extracting the id
-    const {id} = req.params;
-    const user = await User.findById(id).select('-password'); // don't send the password back
-    if(!user) {
-     return next(new HttpError("User not found", 422));
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return next(new HttpError("Invalid user ID", 400));
     }
-res.status(200).json(user);
-} catch(error) {
- return next(error);
+
+    // name and role are all another user needs to see
+    const user = await User.findById(id).select("name role");
+    if (!user) {
+      return next(new HttpError("User not found", 404));
+    }
+    res.status(200).json(user);
+  } catch (error) {
+    return next(error);
   }
-}
+};
 
 export { register, login , getUserProfile};  
