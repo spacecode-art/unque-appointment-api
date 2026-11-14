@@ -1,7 +1,7 @@
 variable "aws_region" {
   description = "Region everything is created in"
   type        = string
-  default     = "us-east-1"
+  default     = "eu-west-1"
 }
 
 variable "name" {
