@@ -59,32 +59,38 @@ const register = async (req, res, next) => {
     return next(error);
   }
 };
-const login = async(req,res,next) => {
+// Compared against when the email isn't registered, so a wrong email takes
+// as long as a wrong password and response time can't be used to find out
+// which emails have accounts.
+const DUMMY_HASH = bcrypt.hashSync("not-a-real-password", SALT_ROUNDS);
+
+const login = async (req, res, next) => {
   try {
-    const {email,password} = req.body;
-    if(!email || !password) {
+    const { email, password } = req.body;
+    if (!isNonEmptyString(email) || !isNonEmptyString(password)) {
       return next(new HttpError("Fill in all fields", 422));
+    }
 
-    }
-    const newEmail = email.toLowerCase();
-    const user = await User.findOne({email: newEmail});
-    if(!user) {
-      return next(new HttpError("Invalid Credentials", 422));
-    }
-    const comparePassword = await bcrypt.compare(password,user.password);
-    // user.password is the hashed password from database
-    if(!comparePassword) {
-      return next(new HttpError("Invalid Password", 422));
-    }
-    const {_id: id, name, role} = user;
-    // a token requires a payload to work
-     const token = jwt.sign({id, name, role}, env.jwtSecret, { algorithm: "HS256", expiresIn: "2d" });
-     res.status(200).json({token,id,name, role})
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    const passwordMatches = await bcrypt.compare(
+      password,
+      user ? user.password : DUMMY_HASH
+    );
 
-  } catch(error) {
+    if (!user || !passwordMatches) {
+      return next(new HttpError("Invalid email or password", 401));
+    }
+
+    const { _id: id, name, role } = user;
+    const token = jwt.sign({ id, name, role }, env.jwtSecret, {
+      algorithm: "HS256",
+      expiresIn: "2d",
+    });
+    res.status(200).json({ token, id, name, role });
+  } catch (error) {
     return next(error);
   }
-}
+};
 const getUserProfile = async(req,res,next) => {
   try {
    // extracting the id
