@@ -103,8 +103,7 @@ const setAvailability = async (req, res, next) => {
       });
   
     } catch (error) {
-      console.error("Error cancelling appointments:", error);
-      return next(new HttpError(error));
+      return next(error);
     }
   };
 export {setAvailability, cancelAppointments};

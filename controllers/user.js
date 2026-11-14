@@ -54,7 +54,7 @@ const login = async(req,res,next) => {
      res.status(200).json({token,id,name, role})
 
   } catch(error) {
-    return next(new HttpError(error));
+    return next(error);
   }
 }
 const getUserProfile = async(req,res,next) => {
@@ -67,7 +67,7 @@ const getUserProfile = async(req,res,next) => {
     }
 res.status(200).json(user);
 } catch(error) {
- return next(new HttpError(error));
+ return next(error);
   }
 }
 
