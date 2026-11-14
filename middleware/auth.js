@@ -8,19 +8,19 @@ const authMiddleware = async (req, res, next) => {
     const token = authorization.split(" ")[1]; // Extract the token
     jwt.verify(token, process.env.JWT_SECRET, (err, info) => {
       if (err) {
-        return next(new HttpError("Unauthorized, Invalid token", 402));
+        return next(new HttpError("Unauthorized, Invalid token", 401));
       }
       req.user = info;
       next();
     });
   } else {
-    return next(new HttpError("Unauthorized, No token", 402));
+    return next(new HttpError("Unauthorized, No token", 401));
   }
 };
 
 const profMiddleware = async(req,res,next) => {
     if (req.user.role !== "professor") {
-        return next(new HttpError("Access denied, only professors can add availability", 403));
+        return next(new HttpError("Access denied, professors only", 403));
       }
       next();
     };
