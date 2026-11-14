@@ -6,7 +6,7 @@ const authMiddleware = async (req, res, next) => {
 
   if (authorization && authorization.startsWith("Bearer ")) {
     const token = authorization.split(" ")[1]; // Extract the token
-    jwt.verify(token, env.jwtSecret, (err, info) => {
+    jwt.verify(token, env.jwtSecret, { algorithms: ["HS256"] }, (err, info) => {
       if (err) {
         return next(new HttpError("Unauthorized, Invalid token", 401));
       }

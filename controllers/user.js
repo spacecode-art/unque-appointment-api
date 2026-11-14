@@ -50,7 +50,7 @@ const login = async(req,res,next) => {
     }
     const {_id: id, name, role} = user;
     // a token requires a payload to work
-     const token = jwt.sign({id, name, role}, env.jwtSecret, {expiresIn: "2d"});
+     const token = jwt.sign({id, name, role}, env.jwtSecret, { algorithm: "HS256", expiresIn: "2d" });
      res.status(200).json({token,id,name, role})
 
   } catch(error) {
