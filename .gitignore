@@ -72,3 +72,4 @@ certs/
 *.tfvars
 !*.tfvars.example
 crash.log
+backend.hcl
