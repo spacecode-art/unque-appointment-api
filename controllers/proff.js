@@ -55,6 +55,46 @@ const setAvailability = async (req, res, next) => {
   }
 };
 
+const updateAvailability = async (req, res, next) => {
+  try {
+    const { slotId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(slotId)) {
+      return next(new HttpError("Invalid slot ID", 400));
+    }
+
+    const { startTime, endTime } = readSlotTimes(req.body);
+
+    // Ignore the slot itself, otherwise nudging a slot by ten minutes
+    // would "overlap" with its own old timing.
+    if (await hasOverlap(req.user.id, startTime, endTime, slotId)) {
+      return next(new HttpError("This overlaps another slot of yours", 409));
+    }
+
+    // The filter is the whole safety check: it only matches a slot that is
+    // yours and still free. Looking first and updating after would leave a
+    // gap in which a student could book the slot.
+    const slot = await Availability.findOneAndUpdate(
+      { _id: slotId, professorId: req.user.id, status: SLOT_STATUS.FREE },
+      { startTime, endTime },
+      { new: true, runValidators: true }
+    );
+
+    if (!slot) {
+      // No match: either not yours or doesn't exist (same answer on purpose,
+      // so nobody can probe for other professors' slot ids), or already booked.
+      const isYours = await Availability.exists({ _id: slotId, professorId: req.user.id });
+      return next(
+        isYours
+          ? new HttpError("A booked slot can't be changed, cancel the appointment first", 409)
+          : new HttpError("Slot not found", 404)
+      );
+    }
+
+    res.status(200).json({ message: "Slot updated successfully", slot });
+  } catch (error) {
+    return next(error);
+  }
+};
 
 
 const cancelAppointments = async (req, res, next) => {
@@ -94,4 +134,4 @@ const cancelAppointments = async (req, res, next) => {
     return next(error);
   }
 };
-export {setAvailability, cancelAppointments};
+export { setAvailability, updateAvailability, cancelAppointments };
