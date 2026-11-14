@@ -1,0 +1,116 @@
+#!/bin/bash
+# First-boot setup for the API server. Terraform passes this in as EC2 user
+# data, so it runs once, as root, the first time the instance starts.
+# Everything it prints is kept in /var/log/unque-bootstrap.log.
+set -euo pipefail
+exec > >(tee -a /var/log/unque-bootstrap.log) 2>&1
+export HOME=/root
+
+REGION="${region}"
+REPO_URL="${repo_url}"
+BRANCH="${repo_branch}"
+APP_DIR=/opt/unque/app
+CERT_FILE=/opt/unque/certs/global-bundle.pem
+
+echo "== packages"
+dnf install -y git nodejs22 nodejs22-npm
+
+# mongosh is only here so we can look at the data from the instance
+cat > /etc/yum.repos.d/mongodb-org-5.0.repo <<'EOF'
+[mongodb-org-5.0]
+name=MongoDB Repository
+baseurl=https://repo.mongodb.org/yum/amazon/2023/mongodb-org/5.0/x86_64/
+gpgcheck=1
+enabled=1
+gpgkey=https://pgp.mongodb.com/server-5.0.asc
+EOF
+dnf install -y mongodb-mongosh-shared-openssl3 || echo "mongosh install failed, carrying on without it"
+
+echo "== user and folders"
+id unque &> /dev/null || useradd --system --home-dir /opt/unque --shell /sbin/nologin unque
+install -d -m 0755 /opt/unque /opt/unque/certs
+install -d -m 0750 -o root -g unque /etc/unque
+
+echo "== DocumentDB CA bundle"
+curl -fsSL -o "$CERT_FILE" https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+chmod 0644 "$CERT_FILE"
+
+echo "== secrets"
+# The role's permissions can take a moment to settle right after launch,
+# so retry instead of failing the whole boot on the first attempt.
+get_secret() {
+  local name="$1" attempt value
+  for attempt in 1 2 3 4 5 6 7 8 9 10; do
+    if value="$(aws ssm get-parameter --region "$REGION" --name "$name" --with-decryption --query Parameter.Value --output text)"; then
+      printf '%s' "$value"
+      return 0
+    fi
+    sleep 10
+  done
+  echo "could not read $name" >&2
+  return 1
+}
+DB_PASSWORD="$(get_secret "${db_password_param}")"
+JWT_SECRET="$(get_secret "${jwt_secret_param}")"
+
+echo "== app settings"
+# Created empty with the right owner and mode first, so the secrets are never
+# readable by anyone else, not even for a moment.
+install -m 0640 -o root -g unque /dev/null /etc/unque/api.env
+cat > /etc/unque/api.env <<EOF
+NODE_ENV="production"
+PORT="80"
+MONGO_URL="mongodb://${docdb_endpoint}:27017/?tls=true&replicaSet=rs0&retryWrites=false"
+DB_NAME="unque"
+DB_USER="${db_username}"
+DB_PASSWORD="$DB_PASSWORD"
+DB_CA_FILE="$CERT_FILE"
+JWT_SECRET="$JWT_SECRET"
+EOF
+
+echo "== service"
+NODE_BIN="$(command -v node)"
+cat > /etc/systemd/system/unque-api.service <<EOF
+[Unit]
+Description=UnQue appointment API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=unque
+Group=unque
+WorkingDirectory=$APP_DIR
+EnvironmentFile=/etc/unque/api.env
+ExecStart=$NODE_BIN index.js
+Restart=on-failure
+RestartSec=5
+# Lets a normal user listen on port 80, and nothing else
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable unque-api
+
+echo "== helper for looking at the database"
+cat > /usr/local/bin/unque-db <<'EOF'
+#!/usr/bin/env bash
+# Opens a mongosh shell on DocumentDB using the app's own settings. Root only.
+set -euo pipefail
+set -a
+. /etc/unque/api.env
+set +a
+exec mongosh "$MONGO_URL" --username "$DB_USER" --password "$DB_PASSWORD" --tlsCAFile "$DB_CA_FILE" "$@"
+EOF
+chmod 0700 /usr/local/bin/unque-db
+
+echo "== code"
+git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
+bash "$APP_DIR/scripts/deploy.sh" "$BRANCH"
+
+echo "== bootstrap finished"

@@ -27,3 +27,21 @@ variable "docdb_instance_class" {
   type        = string
   default     = "db.t3.medium"
 }
+
+variable "instance_type" {
+  description = "Size of the API server"
+  type        = string
+  default     = "t3.micro"
+}
+
+variable "repo_url" {
+  description = "Public Git URL the server clones the API from"
+  type        = string
+  default     = "https://github.com/spacecode-art/unque-appointment-api.git"
+}
+
+variable "repo_branch" {
+  description = "Branch the server deploys on first boot"
+  type        = string
+  default     = "main"
+}
