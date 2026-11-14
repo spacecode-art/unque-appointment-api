@@ -5,8 +5,12 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "nodemon server.js",
+    "start": "node index.js",
+    "dev": "nodemon index.js",
     "test": "jest"
+  },
+  "engines": {
+    "node": ">=22"
   },
   "author": "",
   "license": "ISC",
