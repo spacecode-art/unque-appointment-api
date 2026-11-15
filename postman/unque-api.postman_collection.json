@@ -1,0 +1,308 @@
+{
+  "info": {
+    "name": "UnQue Appointment API",
+    "description": "The ten-step flow from the brief, in order, followed by a few edge cases. Pick an environment with baseUrl set (or edit the collection variable), then send the requests from top to bottom. Tokens and ids are passed from one request to the next by the test scripts.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5001" }
+  ],
+  "item": [
+    {
+      "name": "1a. Student A1 registers",
+      "event": [
+        { "listen": "prerequest", "script": { "type": "text/javascript", "exec": ["pm.collectionVariables.set('runId', Date.now());"] } },
+        { "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('registered', () => pm.response.to.have.status(201));"] } }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"name\":\"Student A1\",\"email\":\"a1-{{runId}}@test.com\",\"password\":\"password123\",\"confirmPassword\":\"password123\",\"role\":\"student\"}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/users/register"
+      }
+    },
+    {
+      "name": "1b. Student A1 logs in",
+      "event": [
+        { "listen": "test", "script": { "type": "text/javascript", "exec": [
+          "pm.test('logged in', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "pm.collectionVariables.set('a1Token', body.token);",
+          "pm.collectionVariables.set('a1Id', body.id);"
+        ] } }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"email\":\"a1-{{runId}}@test.com\",\"password\":\"password123\"}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/users/login"
+      }
+    },
+    {
+      "name": "2a. Professor P1 registers",
+      "event": [
+        { "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('registered', () => pm.response.to.have.status(201));"] } }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"name\":\"Professor P1\",\"email\":\"p1-{{runId}}@test.com\",\"password\":\"password123\",\"confirmPassword\":\"password123\",\"role\":\"professor\"}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/users/register"
+      }
+    },
+    {
+      "name": "2b. Professor P1 logs in",
+      "event": [
+        { "listen": "test", "script": { "type": "text/javascript", "exec": [
+          "pm.test('logged in', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "pm.collectionVariables.set('profToken', body.token);",
+          "pm.collectionVariables.set('profId', body.id);"
+        ] } }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"email\":\"p1-{{runId}}@test.com\",\"password\":\"password123\"}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/users/login"
+      }
+    },
+    {
+      "name": "3a. P1 adds free slot T1 (10:00-11:00)",
+      "event": [
+        { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+          "const d = new Date(); d.setUTCDate(d.getUTCDate() + 7);",
+          "d.setUTCHours(10, 0, 0, 0); pm.variables.set('start', d.toISOString());",
+          "d.setUTCHours(11); pm.variables.set('end', d.toISOString());"
+        ] } },
+        { "listen": "test", "script": { "type": "text/javascript", "exec": [
+          "pm.test('slot added', () => pm.response.to.have.status(201));",
+          "pm.collectionVariables.set('slotT1', pm.response.json().slot.id);"
+        ] } }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{profToken}}", "type": "string" }] },
+        "body": { "mode": "raw", "raw": "{\"startTime\":\"{{start}}\",\"endTime\":\"{{end}}\"}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/professor/availability"
+      }
+    },
+    {
+      "name": "3b. P1 adds free slot T2 (11:00-12:00)",
+      "event": [
+        { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+          "const d = new Date(); d.setUTCDate(d.getUTCDate() + 7);",
+          "d.setUTCHours(11, 0, 0, 0); pm.variables.set('start', d.toISOString());",
+          "d.setUTCHours(12); pm.variables.set('end', d.toISOString());"
+        ] } },
+        { "listen": "test", "script": { "type": "text/javascript", "exec": [
+          "pm.test('slot added', () => pm.response.to.have.status(201));",
+          "pm.collectionVariables.set('slotT2', pm.response.json().slot.id);"
+        ] } }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{profToken}}", "type": "string" }] },
+        "body": { "mode": "raw", "raw": "{\"startTime\":\"{{start}}\",\"endTime\":\"{{end}}\"}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/professor/availability"
+      }
+    },
+    {
+      "name": "3c. P1 adds free slot T3 (14:00-15:00)",
+      "event": [
+        { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+          "const d = new Date(); d.setUTCDate(d.getUTCDate() + 7);",
+          "d.setUTCHours(14, 0, 0, 0); pm.variables.set('start', d.toISOString());",
+          "d.setUTCHours(15); pm.variables.set('end', d.toISOString());"
+        ] } },
+        { "listen": "test", "script": { "type": "text/javascript", "exec": [
+          "pm.test('slot added', () => pm.response.to.have.status(201));",
+          "pm.collectionVariables.set('slotT3', pm.response.json().slot.id);"
+        ] } }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{profToken}}", "type": "string" }] },
+        "body": { "mode": "raw", "raw": "{\"startTime\":\"{{start}}\",\"endTime\":\"{{end}}\"}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/professor/availability"
+      }
+    },
+    {
+      "name": "4. A1 views P1's available slots",
+      "event": [
+        { "listen": "test", "script": { "type": "text/javascript", "exec": [
+          "pm.test('slots listed', () => pm.response.to.have.status(200));",
+          "pm.test('three free slots', () => pm.expect(pm.response.json().availableSlots.length).to.eql(3));"
+        ] } }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{a1Token}}", "type": "string" }] },
+        "url": "{{baseUrl}}/general/professor/{{profId}}/availability"
+      }
+    },
+    {
+      "name": "5. A1 books T1",
+      "event": [
+        { "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('booked', () => pm.response.to.have.status(201));"] } }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{a1Token}}", "type": "string" }] },
+        "body": { "mode": "raw", "raw": "{\"slotId\":\"{{slotT1}}\"}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/general/book"
+      }
+    },
+    {
+      "name": "6a. Student A2 registers",
+      "event": [
+        { "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('registered', () => pm.response.to.have.status(201));"] } }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"name\":\"Student A2\",\"email\":\"a2-{{runId}}@test.com\",\"password\":\"password123\",\"confirmPassword\":\"password123\",\"role\":\"student\"}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/users/register"
+      }
+    },
+    {
+      "name": "6b. Student A2 logs in",
+      "event": [
+        { "listen": "test", "script": { "type": "text/javascript", "exec": [
+          "pm.test('logged in', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "pm.collectionVariables.set('a2Token', body.token);",
+          "pm.collectionVariables.set('a2Id', body.id);"
+        ] } }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"email\":\"a2-{{runId}}@test.com\",\"password\":\"password123\"}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/users/login"
+      }
+    },
+    {
+      "name": "7. A2 books T2",
+      "event": [
+        { "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('booked', () => pm.response.to.have.status(201));"] } }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{a2Token}}", "type": "string" }] },
+        "body": { "mode": "raw", "raw": "{\"slotId\":\"{{slotT2}}\"}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/general/book"
+      }
+    },
+    {
+      "name": "8. [NEW API] P1 updates the timing of free slot T3",
+      "event": [
+        { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+          "const d = new Date(); d.setUTCDate(d.getUTCDate() + 8);",
+          "d.setUTCHours(14, 0, 0, 0); pm.variables.set('start', d.toISOString());",
+          "d.setUTCHours(15, 30); pm.variables.set('end', d.toISOString());"
+        ] } },
+        { "listen": "test", "script": { "type": "text/javascript", "exec": [
+          "pm.test('updated', () => pm.response.to.have.status(200));",
+          "const slot = pm.response.json().slot;",
+          "pm.test('same slot id, not recreated', () => pm.expect(slot.id).to.eql(pm.collectionVariables.get('slotT3')));",
+          "pm.test('still free', () => pm.expect(slot.status).to.eql('free'));"
+        ] } }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{profToken}}", "type": "string" }] },
+        "body": { "mode": "raw", "raw": "{\"startTime\":\"{{start}}\",\"endTime\":\"{{end}}\"}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/professor/availability/{{slotT3}}"
+      }
+    },
+    {
+      "name": "9. P1 cancels the appointment with A1",
+      "event": [
+        { "listen": "test", "script": { "type": "text/javascript", "exec": [
+          "pm.test('cancelled', () => pm.response.to.have.status(200));",
+          "pm.test('one appointment cancelled', () => pm.expect(pm.response.json().cancelled).to.eql(1));"
+        ] } }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [],
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{profToken}}", "type": "string" }] },
+        "url": "{{baseUrl}}/professor/cancel-appointments/{{a1Id}}"
+      }
+    },
+    {
+      "name": "10. A1 checks their appointments",
+      "event": [
+        { "listen": "test", "script": { "type": "text/javascript", "exec": [
+          "pm.test('listed', () => pm.response.to.have.status(200));",
+          "pm.test('no pending appointments', () => pm.expect(pm.response.json().appointments.length).to.eql(0));"
+        ] } }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{a1Token}}", "type": "string" }] },
+        "url": "{{baseUrl}}/general/appointments"
+      }
+    },
+    {
+      "name": "Edge 1. A1 tries to book T2, which A2 already holds",
+      "event": [
+        { "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('refused with 409', () => pm.response.to.have.status(409));"] } }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{a1Token}}", "type": "string" }] },
+        "body": { "mode": "raw", "raw": "{\"slotId\":\"{{slotT2}}\"}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/general/book"
+      }
+    },
+    {
+      "name": "Edge 2. A student tries to edit a slot",
+      "event": [
+        { "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('refused with 403', () => pm.response.to.have.status(403));"] } }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{a1Token}}", "type": "string" }] },
+        "body": { "mode": "raw", "raw": "{\"startTime\":\"2030-01-01T10:00:00Z\",\"endTime\":\"2030-01-01T11:00:00Z\"}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/professor/availability/{{slotT3}}"
+      }
+    },
+    {
+      "name": "Edge 3. P1 tries to edit the booked slot T2",
+      "event": [
+        { "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('refused with 409', () => pm.response.to.have.status(409));"] } }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{profToken}}", "type": "string" }] },
+        "body": { "mode": "raw", "raw": "{\"startTime\":\"2030-01-01T10:00:00Z\",\"endTime\":\"2030-01-01T11:00:00Z\"}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/professor/availability/{{slotT2}}"
+      }
+    },
+    {
+      "name": "Edge 4. A request without a token",
+      "event": [
+        { "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('refused with 401', () => pm.response.to.have.status(401));"] } }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": { "type": "noauth" },
+        "url": "{{baseUrl}}/general/appointments"
+      }
+    }
+  ]
+}
