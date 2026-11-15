@@ -17,6 +17,19 @@ resource "aws_docdb_cluster_parameter_group" "main" {
     name  = "tls"
     value = "tls1.2+"
   }
+
+  parameter {
+    name         = "audit_logs"
+    value        = "enabled"
+    apply_method = "immediate"
+  }
+}
+
+# DocumentDB writes to a log group named after the cluster. Creating it here
+# first, with a retention period, stops it being created on demand and kept forever.
+resource "aws_cloudwatch_log_group" "docdb_audit" {
+  name              = "/aws/docdb/${var.name}-docdb/audit"
+  retention_in_days = 7
 }
 
 resource "aws_docdb_cluster" "main" {
@@ -33,6 +46,9 @@ resource "aws_docdb_cluster" "main" {
 
   storage_encrypted       = true
   backup_retention_period = 1
+
+  enabled_cloudwatch_logs_exports = ["audit"]
+  depends_on                      = [aws_cloudwatch_log_group.docdb_audit]
 
   # Demo settings, on purpose: a final snapshot or deletion protection would
   # make "terraform destroy" stop halfway and leave a bill running.
