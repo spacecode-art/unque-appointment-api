@@ -24,14 +24,17 @@ resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
   tags = { Name = "${var.name}-igw" }
+
 }
 
 # The API server lives here. It needs a public address so Postman can reach it.
 resource "aws_subnet" "public" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = cidrsubnet(var.vpc_cidr, 8, 0)
-  availability_zone       = local.azs[0]
-  map_public_ip_on_launch = true
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = cidrsubnet(var.vpc_cidr, 8, 0)
+  availability_zone = local.azs[0]
+
+  # No automatic public IPs: the API server asks for its own (see ec2.tf), so
+  # anything else added to this subnet later is private by default.
 
   tags = { Name = "${var.name}-public-${local.azs[0]}" }
 }
