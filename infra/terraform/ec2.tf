@@ -6,13 +6,13 @@ data "aws_ssm_parameter" "al2023" {
 resource "aws_instance" "api" {
   #checkov:skip=CKV_AWS_88:The API has to be reachable from Postman. A production setup would sit behind a load balancer and keep the instance private.
   #checkov:skip=CKV_AWS_126:Basic 5-minute metrics are enough for a short-lived demo, and detailed monitoring is billed per instance.
+  #checkov:skip=CKV_AWS_135:t3 instances are always EBS-optimized and it can't be switched off. Setting the flag explicitly makes Terraform replace the server.
   ami                         = data.aws_ssm_parameter.al2023.insecure_value
   instance_type               = var.instance_type
   subnet_id                   = aws_subnet.public.id
   vpc_security_group_ids      = [aws_security_group.api.id]
   iam_instance_profile        = aws_iam_instance_profile.api.name
   associate_public_ip_address = true
-  ebs_optimized               = true
 
   user_data = templatefile("${path.module}/../../scripts/bootstrap.sh.tftpl", {
     region            = var.aws_region
