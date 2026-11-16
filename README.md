@@ -138,6 +138,12 @@ The apply takes 10 to 15 minutes, mostly DocumentDB. The server clones this repo
 BASE_URL=$(terraform output -raw api_url) ../../scripts/smoke-test.sh
 ```
 
+To ship a new version of the API to the running server, open a shell on the instance (Session Manager in the EC2 console) and run:
+
+```bash
+sudo bash /opt/unque/app/scripts/deploy.sh main
+```
+
 To look at the data, open Session Manager on the instance from the EC2 console and run `sudo unque-db`, which opens a mongosh session with the app's credentials.
 
 **Cost.** DocumentDB is not free beyond its 30-day trial, so tear everything down when finished:
@@ -161,6 +167,7 @@ BASE_URL=http://<server-ip> ./scripts/smoke-test.sh
 ## Known gaps
 
 - **No HTTPS.** There is no domain, so the API is plain HTTP and tokens travel in the clear. A real deployment would put a load balancer with a certificate in front.
+- **Deploys are manual.** CI checks every PR but nothing deploys it. A release goes out by running `scripts/deploy.sh` on the server, and Terraform changes are applied from a laptop. The next step would be a pipeline using GitHub OIDC and Systems Manager, with no stored keys.
 - **Port 80 is open to the whole internet.** That's how the API is reached from Postman. `allowed_http_cidrs` in the Terraform variables narrows it to chosen addresses.
 - **Encryption uses AWS-managed keys.** Parameter Store, DocumentDB and the audit log group are all encrypted, but with AWS-managed keys and not customer-managed ones. A customer key would add key-policy work and, for DocumentDB, a rebuild.
 - **The API server has a public IP**, which the demo needs. In production it would sit behind a load balancer and stay private.
