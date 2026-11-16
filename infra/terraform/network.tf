@@ -1,15 +1,8 @@
-data "aws_availability_zones" "available" {
-  state = "available"
-
-  # Skip local zones, which need a separate opt-in
-  filter {
-    name   = "opt-in-status"
-    values = ["opt-in-not-required"]
-  }
-}
-
 locals {
-  azs = slice(data.aws_availability_zones.available.names, 0, 2)
+  # Fixed, not looked up. A lookup returns whatever zones exist today, so if AWS
+  # ever added or reordered one, Terraform would want to move the subnets, and
+  # moving subnets means rebuilding everything inside them.
+  azs = ["${var.aws_region}a", "${var.aws_region}b"]
 }
 
 resource "aws_vpc" "main" {
