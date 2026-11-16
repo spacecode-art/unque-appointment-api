@@ -10,6 +10,7 @@ resource "aws_instance" "api" {
   vpc_security_group_ids      = [aws_security_group.api.id]
   iam_instance_profile        = aws_iam_instance_profile.api.name
   associate_public_ip_address = true
+  ebs_optimized               = true
 
   user_data = templatefile("${path.module}/../../scripts/bootstrap.sh.tftpl", {
     region            = var.aws_region

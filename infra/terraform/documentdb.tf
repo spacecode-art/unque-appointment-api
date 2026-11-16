@@ -29,7 +29,7 @@ resource "aws_docdb_cluster_parameter_group" "main" {
 # first, with a retention period, stops it being created on demand and kept forever.
 resource "aws_cloudwatch_log_group" "docdb_audit" {
   name              = "/aws/docdb/${var.name}-docdb/audit"
-  retention_in_days = 7
+  retention_in_days = 365
 }
 
 resource "aws_docdb_cluster" "main" {
@@ -45,7 +45,7 @@ resource "aws_docdb_cluster" "main" {
   db_cluster_parameter_group_name = aws_docdb_cluster_parameter_group.main.name
 
   storage_encrypted       = true
-  backup_retention_period = 1
+  backup_retention_period = 7
 
   enabled_cloudwatch_logs_exports = ["audit"]
   depends_on                      = [aws_cloudwatch_log_group.docdb_audit]
