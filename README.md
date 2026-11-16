@@ -161,6 +161,7 @@ BASE_URL=http://<server-ip> ./scripts/smoke-test.sh
 ## Known gaps
 
 - **No HTTPS.** There is no domain, so the API is plain HTTP and tokens travel in the clear. A real deployment would put a load balancer with a certificate in front.
+- **Port 80 is open to the whole internet.** That's how the API is reached from Postman. `allowed_http_cidrs` in the Terraform variables narrows it to chosen addresses.
 - **Encryption uses AWS-managed keys.** Parameter Store, DocumentDB and the audit log group are all encrypted, but with AWS-managed keys and not customer-managed ones. A customer key would add key-policy work and, for DocumentDB, a rebuild.
 - **The API server has a public IP**, which the demo needs. In production it would sit behind a load balancer and stay private.
 - **The app connects as the DocumentDB master user.** It should use a user limited to one database.

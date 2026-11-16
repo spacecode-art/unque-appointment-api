@@ -7,6 +7,7 @@ resource "aws_security_group" "api" {
 }
 
 resource "aws_vpc_security_group_ingress_rule" "api_http" {
+  #checkov:skip=CKV_AWS_260:The API is public by design so it can be reached from Postman. Narrow allowed_http_cidrs to restrict it.
   for_each = toset(var.allowed_http_cidrs)
 
   security_group_id = aws_security_group.api.id
