@@ -3,9 +3,7 @@ name: Terraform
 on:
   push:
     branches: [main]
-    paths: ["infra/**", ".github/workflows/terraform.yml"]
   pull_request:
-    paths: ["infra/**", ".github/workflows/terraform.yml"]
 
 permissions:
   contents: read
@@ -36,6 +34,3 @@ jobs:
         with:
           directory: infra/terraform
           framework: terraform
-          # First run only reports. We read what it finds, fix or justify each
-          # finding, and then remove this line so it starts to block.
-          soft_fail: true
