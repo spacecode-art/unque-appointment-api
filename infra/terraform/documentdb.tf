@@ -28,11 +28,13 @@ resource "aws_docdb_cluster_parameter_group" "main" {
 # DocumentDB writes to a log group named after the cluster. Creating it here
 # first, with a retention period, stops it being created on demand and kept forever.
 resource "aws_cloudwatch_log_group" "docdb_audit" {
+  #checkov:skip=CKV_AWS_158:CloudWatch already encrypts logs at rest. A customer-managed key is a later step, together with the ones for Parameter Store and DocumentDB.
   name              = "/aws/docdb/${var.name}-docdb/audit"
   retention_in_days = 365
 }
 
 resource "aws_docdb_cluster" "main" {
+  #checkov:skip=CKV_AWS_182:Storage is encrypted with the AWS-managed key. A customer-managed key can't be added to an existing cluster, so it means rebuilding the database.
   cluster_identifier = "${var.name}-docdb"
   engine             = "docdb"
   engine_version     = "5.0.0"

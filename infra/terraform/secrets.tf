@@ -14,6 +14,7 @@ resource "random_password" "jwt" {
 }
 
 resource "aws_ssm_parameter" "db_password" {
+  #checkov:skip=CKV_AWS_337:The AWS-managed key is sufficient here. A customer-managed key adds cost and key-policy upkeep without a threat that needs it.
   name        = "/${var.name}/db_password"
   description = "DocumentDB master password"
   type        = "SecureString"
@@ -21,6 +22,7 @@ resource "aws_ssm_parameter" "db_password" {
 }
 
 resource "aws_ssm_parameter" "jwt_secret" {
+  #checkov:skip=CKV_AWS_337:The AWS-managed key is sufficient here. A customer-managed key adds cost and key-policy upkeep without a threat that needs it.
   name        = "/${var.name}/jwt_secret"
   description = "Signing key for the API's JWTs"
   type        = "SecureString"

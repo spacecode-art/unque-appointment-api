@@ -4,6 +4,8 @@ data "aws_ssm_parameter" "al2023" {
 }
 
 resource "aws_instance" "api" {
+  #checkov:skip=CKV_AWS_88:The API has to be reachable from Postman. A production setup would sit behind a load balancer and keep the instance private.
+  #checkov:skip=CKV_AWS_126:Basic 5-minute metrics are enough for a short-lived demo, and detailed monitoring is billed per instance.
   ami                         = data.aws_ssm_parameter.al2023.insecure_value
   instance_type               = var.instance_type
   subnet_id                   = aws_subnet.public.id
