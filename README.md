@@ -176,4 +176,4 @@ BASE_URL=http://<server-ip> ./scripts/smoke-test.sh
 - **One instance of everything.** No replicas or failover, partly because the free trial covers exactly one instance.
 - **Anyone can register as a professor.** Fine for this project, but a real system would need an invite or approval.
 - **No rate limiting**, for example on login.
-- **Tests are end-to-end only.** There is a smoke test and a Postman collection, but no unit tests.
+- **Little unit-test coverage.** Only the date parser and the error handler have unit tests. Booking and the rest are tested end to end by the smoke test and the Postman collection.
