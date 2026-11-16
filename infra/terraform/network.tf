@@ -1,15 +1,8 @@
-data "aws_availability_zones" "available" {
-  state = "available"
-
-  # Skip local zones, which need a separate opt-in
-  filter {
-    name   = "opt-in-status"
-    values = ["opt-in-not-required"]
-  }
-}
-
 locals {
-  azs = slice(data.aws_availability_zones.available.names, 0, 2)
+  # Fixed, not looked up. A lookup returns whatever zones exist today, so if AWS
+  # ever added or reordered one, Terraform would want to move the subnets, and
+  # moving subnets means rebuilding everything inside them.
+  azs = ["${var.aws_region}a", "${var.aws_region}b"]
 }
 
 resource "aws_vpc" "main" {
@@ -24,14 +17,17 @@ resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
   tags = { Name = "${var.name}-igw" }
+
 }
 
 # The API server lives here. It needs a public address so Postman can reach it.
 resource "aws_subnet" "public" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = cidrsubnet(var.vpc_cidr, 8, 0)
-  availability_zone       = local.azs[0]
-  map_public_ip_on_launch = true
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = cidrsubnet(var.vpc_cidr, 8, 0)
+  availability_zone = local.azs[0]
+
+  # No automatic public IPs: the API server asks for its own (see ec2.tf), so
+  # anything else added to this subnet later is private by default.
 
   tags = { Name = "${var.name}-public-${local.azs[0]}" }
 }
